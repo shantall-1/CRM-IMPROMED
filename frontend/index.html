@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BYB INPROMED - Sistema de Ventas</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Sidebar -->
+    <nav class="sidebar">
+<div class="sidebar-header">
+    <i class="fas fa-industry"></i>
+    <div>
+        <h2>BYB INPROMED</h2>
+        <span>S.A.C. - Sistema de Ventas</span>
+    </div>
+</div>
+</div>
+        <ul class="sidebar-menu">
+            <li class="active" onclick="showSection('dashboard')">
+                <i class="fas fa-chart-line"></i>
+                <span>Dashboard</span>
+            </li>
+            <li onclick="showSection('ventas')">
+                <i class="fas fa-shopping-cart"></i>
+                <span>Ventas</span>
+            </li>
+            <li onclick="showSection('clientes')">
+                <i class="fas fa-users"></i>
+                <span>Clientes</span>
+            </li>
+            <li onclick="showSection('metas')">
+                <i class="fas fa-bullseye"></i>
+                <span>Metas</span>
+            </li>
+            <li onclick="showSection('reportes')">
+                <i class="fas fa-file-alt"></i>
+                <span>Reportes</span>
+            </li>
+        </ul>
+        <div class="sidebar-footer">
+            <div class="connection-status">
+                <span class="status-dot" id="connectionDot"></span>
+                <span id="connectionText">Conectado</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Header -->
+        <header class="header">
+            <h1 id="pageTitle">Dashboard</h1>
+            <div class="header-actions">
+                <button class="btn btn-primary" onclick="openModal('venta')">
+                    <i class="fas fa-plus"></i> Nueva Venta
+                </button>
+                <button class="btn btn-secondary" onclick="openModal('cliente')">
+                    <i class="fas fa-user-plus"></i> Nuevo Cliente
+                </button>
+                <div class="user-profile">
+                    <i class="fas fa-user-circle"></i>
+                    <span>Admin</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- DASHBOARD SECTION -->
+        <section id="dashboard" class="section active">
+            <!-- KPI Cards -->
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <div class="kpi-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                        <i class="fas fa-dollar-sign"></i>
+                    </div>
+                    <div class="kpi-info">
+                        <h3 id="ventasTotales">S/ 0.00</h3>
+                        <p>Ventas Totales</p>
+                        <span class="kpi-trend positive" id="trendTotal">
+                            <i class="fas fa-minus"></i> 0%
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="kpi-card">
+                    <div class="kpi-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                        <i class="fas fa-calendar-day"></i>
+                    </div>
+                    <div class="kpi-info">
+                        <h3 id="ventasMes">S/ 0.00</h3>
+                        <p>Ventas Este Mes</p>
+                        <span class="kpi-trend positive" id="trendMes">
+                            <i class="fas fa-minus"></i> 0%
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="kpi-card">
+                    <div class="kpi-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="kpi-info">
+                        <h3 id="totalClientes">0</h3>
+                        <p>Clientes Registrados</p>
+                        <span class="kpi-trend neutral">
+                            <i class="fas fa-minus"></i> 0%
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="kpi-card">
+                    <div class="kpi-icon" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                        <i class="fas fa-shopping-bag"></i>
+                    </div>
+                    <div class="kpi-info">
+                        <h3 id="totalVentas">0</h3>
+                        <p>Total de Ventas</p>
+                        <span class="kpi-trend positive" id="trendVentas">
+                            <i class="fas fa-minus"></i> 0%
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Meta de Ventas -->
+            <div class="meta-card">
+                <div class="meta-header">
+                    <h3><i class="fas fa-bullseye"></i> Meta del Mes (S/)</h3>
+                    <span id="metaMonto">Meta: S/ 0.00</span>
+                </div>
+                <div class="meta-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="metaProgress" style="width: 0%"></div>
+                    </div>
+                    <div class="meta-stats">
+                        <span id="metaActual">S/ 0.00</span>
+                        <span id="metaPorcentaje">0%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gráficos -->
+            <div class="charts-grid">
+                <div class="chart-container large">
+                    <div class="chart-header">
+                        <h3>Ventas por Mes (S/)</h3>
+                        <select id="anioSelect" onchange="updateCharts()">
+                            <!-- Se llena dinámicamente -->
+                        </select>
+                    </div>
+                    <canvas id="chartMeses"></canvas>
+                </div>
+                
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h3>Últimos 30 Días</h3>
+                    </div>
+                    <canvas id="chartDias"></canvas>
+                </div>
+                
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h3>Por Categoría</h3>
+                    </div>
+                    <canvas id="chartCategorias"></canvas>
+                </div>
+                
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h3>Top Clientes</h3>
+                    </div>
+                    <canvas id="chartClientes"></canvas>
+                </div>
+                
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h3>Métodos de Pago</h3>
+                    </div>
+                    <canvas id="chartMetodos"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- VENTAS SECTION -->
+        <section id="ventas" class="section">
+            <!-- Filtros -->
+            <div class="filters-card">
+                <h3><i class="fas fa-filter"></i> Filtros Avanzados</h3>
+                <div class="filters-grid">
+                    <div class="filter-group">
+                        <label>Fecha Inicio</label>
+                        <input type="date" id="filtroFechaInicio">
+                    </div>
+                    <div class="filter-group">
+                        <label>Fecha Fin</label>
+                        <input type="date" id="filtroFechaFin">
+                    </div>
+                    <div class="filter-group">
+                        <label>Mes</label>
+                        <select id="filtroMes">
+                            <option value="">Todos</option>
+                            <option value="1">Enero</option>
+                            <option value="2">Febrero</option>
+                            <option value="3">Marzo</option>
+                            <option value="4">Abril</option>
+                            <option value="5">Mayo</option>
+                            <option value="6">Junio</option>
+                            <option value="7">Julio</option>
+                            <option value="8">Agosto</option>
+                            <option value="9">Septiembre</option>
+                            <option value="10">Octubre</option>
+                            <option value="11">Noviembre</option>
+                            <option value="12">Diciembre</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Año</label>
+                        <select id="filtroAnio">
+                            <!-- Se llena dinámicamente -->
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Categoría</label>
+                        <select id="filtroCategoria">
+                            <option value="">Todas</option>
+                            <option value="Tableros Eléctricos">Tableros Eléctricos</option>
+                            <option value="Gabinetes Metálicos">Gabinetes Metálicos</option>
+                            <option value="Servicios">Servicios</option>
+                            <option value="Otros">Otros</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Monto Mínimo (S/)</label>
+                        <input type="number" id="filtroMontoMin" placeholder="0.00" step="0.01">
+                    </div>
+                    <div class="filter-group">
+                        <label>Monto Máximo (S/)</label>
+                        <input type="number" id="filtroMontoMax" placeholder="999999" step="0.01">
+                    </div>
+                    <div class="filter-group">
+                        <label>Estado</label>
+                        <select id="filtroEstado">
+                            <option value="">Todos</option>
+                            <option value="completada">Completada</option>
+                            <option value="pendiente">Pendiente</option>
+                            <option value="cancelada">Cancelada</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Cliente</label>
+                        <select id="filtroCliente">
+                            <option value="">Todos</option>
+                        </select>
+                    </div>
+                    <div class="filter-actions">
+                        <button class="btn btn-primary" onclick="aplicarFiltros()">
+                            <i class="fas fa-search"></i> Aplicar
+                        </button>
+                        <button class="btn btn-secondary" onclick="limpiarFiltros()">
+                            <i class="fas fa-eraser"></i> Limpiar
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabla de Ventas -->
+            <div class="table-card">
+                <div class="table-header">
+                    <h3>Listado de Ventas</h3>
+                    <button class="btn btn-export" onclick="exportarVentas()">
+                        <i class="fas fa-download"></i> Exportar CSV
+                    </button>
+                </div>
+                <div class="table-responsive">
+                    <table id="tablaVentas">
+                        <thead>
+                            <tr>
+                                <th>Correlativo</th>
+                                <th>Cliente</th>
+                                <th>Categoría</th>
+                                <th>Producto</th>
+                                <th>Monto (S/)</th>
+                                <th>Fecha</th>
+                                <th>Método</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyVentas">
+                            <!-- Se llena dinámicamente -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- CLIENTES SECTION -->
+        <section id="clientes" class="section">
+            <div class="filters-card">
+                <h3><i class="fas fa-search"></i> Buscar Cliente</h3>
+                <div class="filters-grid">
+                    <div class="filter-group" style="grid-column: span 3;">
+                        <label>Buscar por Nombre o RUC</label>
+                        <input type="text" id="buscarCliente" placeholder="Ingrese nombre o RUC..." onkeyup="buscarClientes()">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="table-card">
+                <div class="table-header">
+                    <h3>Listado de Clientes</h3>
+                </div>
+                <div class="table-responsive">
+                    <table id="tablaClientes">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nombre / Razón Social</th>
+                                <th>RUC</th>
+                                <th>Contacto</th>
+                                <th>Email</th>
+                                <th>Teléfono</th>
+                                <th>Total Compras (S/)</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyClientes">
+                            <!-- Se llena dinámicamente -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- METAS SECTION -->
+        <section id="metas" class="section">
+            <div class="metas-container">
+                <div class="metas-header">
+                    <h3>Metas de Ventas por Mes (S/)</h3>
+                    <button class="btn btn-primary" onclick="openModal('meta')">
+                        <i class="fas fa-plus"></i> Nueva Meta
+                    </button>
+                </div>
+                <div id="metasList" class="metas-grid">
+                    <!-- Se llena dinámicamente -->
+                </div>
+            </div>
+        </section>
+
+        <!-- REPORTES SECTION -->
+        <section id="reportes" class="section">
+            <div class="reportes-grid">
+                <div class="reporte-card" onclick="descargarReporte('diario')">
+                    <i class="fas fa-calendar-day"></i>
+                    <h4>Reporte Diario</h4>
+                    <p>Ventas del día actual con gráficos</p>
+                    <button class="btn btn-primary" style="margin-top: 15px;">
+                        <i class="fas fa-download"></i> Descargar PDF
+                    </button>
+                </div>
+                <div class="reporte-card" onclick="descargarReporte('semanal')">
+                    <i class="fas fa-calendar-week"></i>
+                    <h4>Reporte Semanal</h4>
+                    <p>Últimos 7 días con análisis</p>
+                    <button class="btn btn-primary" style="margin-top: 15px;">
+                        <i class="fas fa-download"></i> Descargar PDF
+                    </button>
+                </div>
+                <div class="reporte-card" onclick="descargarReporte('mensual')">
+                    <i class="fas fa-calendar-alt"></i>
+                    <h4>Reporte Mensual</h4>
+                    <p>Análisis completo del mes</p>
+                    <button class="btn btn-primary" style="margin-top: 15px;">
+                        <i class="fas fa-download"></i> Descargar PDF
+                    </button>
+                </div>
+                <div class="reporte-card" onclick="descargarReporte('anual')">
+                    <i class="fas fa-calendar"></i>
+                    <h4>Reporte Anual</h4>
+                    <p>Resumen anual con estadísticas</p>
+                    <button class="btn btn-primary" style="margin-top: 15px;">
+                        <i class="fas fa-download"></i> Descargar PDF
+                    </button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- MODALES -->
+    
+    <!-- Modal Nueva Venta -->
+    <!-- Modal Nueva Venta -->
+    <div id="modalVenta" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-shopping-cart"></i> Registrar Nueva Venta</h3>
+                <button class="close-btn" onclick="closeModal('venta')">&times;</button>
+            </div>
+            <form id="formVenta" onsubmit="guardarVenta(event)">
+                <div class="form-group">
+                    <label>Cliente *</label>
+                    <select id="ventaCliente" required>
+                        <option value="">Seleccionar cliente...</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Categoría *</label>
+                        <select id="ventaCategoria" required onchange="filtrarProductos()">
+                            <option value="">Seleccionar...</option>
+                            <option value="Tableros Eléctricos">Tableros Eléctricos</option>
+                            <option value="Gabinetes Metálicos">Gabinetes Metálicos</option>
+                            <option value="Servicios">Servicios</option>
+                            <option value="Otros">Otros</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Producto/Servicio *</label>
+                        <select id="ventaProducto" required>
+                            <option value="">Primero seleccione categoría...</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Descripción (Opcional)</label>
+                    <textarea id="ventaDescripcion" rows="2" placeholder="Detalles adicionales..."></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Monto (S/) *</label>
+                        <input type="number" id="ventaMonto" step="0.01" required placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label>Método de Pago</label>
+                        <select id="ventaMetodo">
+                            <option value="Efectivo">Efectivo</option>
+                            <option value="Transferencia">Transferencia</option>
+                            <option value="Yape">Yape</option>
+                            <option value="Plin">Plin</option>
+                            <option value="Tarjeta">Tarjeta</option>
+                            <option value="Crédito">Crédito</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('venta')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Venta</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Editar Venta -->
+    <div id="modalVentaEdit" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-edit"></i> Editar Venta <span id="editVentaCorrelativo" style="color: #667eea; font-size: 14px;"></span></h3>
+                <button class="close-btn" onclick="closeModal('ventaEdit')">&times;</button>
+            </div>
+            <form id="formVentaEdit" onsubmit="guardarEdicionVenta(event)">
+                <input type="hidden" id="editVentaId">
+                <div class="form-group">
+                    <label>Cliente *</label>
+                    <select id="editVentaCliente" required>
+                        <option value="">Seleccionar cliente...</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Categoría *</label>
+                        <select id="editVentaCategoria" required onchange="filtrarProductosEdit(this.value)">
+                            <option value="">Seleccionar...</option>
+                            <option value="Tableros Eléctricos">Tableros Eléctricos</option>
+                            <option value="Gabinetes Metálicos">Gabinetes Metálicos</option>
+                            <option value="Servicios">Servicios</option>
+                            <option value="Otros">Otros</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Producto/Servicio *</label>
+                        <select id="editVentaProducto" required>
+                            <option value="">Primero seleccione categoría...</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Descripción (Opcional)</label>
+                    <textarea id="editVentaDescripcion" rows="2" placeholder="Detalles adicionales..."></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Monto (S/) *</label>
+                        <input type="number" id="editVentaMonto" step="0.01" required placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label>Método de Pago</label>
+                        <select id="editVentaMetodo">
+                            <option value="Efectivo">Efectivo</option>
+                            <option value="Transferencia">Transferencia</option>
+                            <option value="Yape">Yape</option>
+                            <option value="Plin">Plin</option>
+                            <option value="Tarjeta">Tarjeta</option>
+                            <option value="Crédito">Crédito</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Estado *</label>
+                    <select id="editVentaEstado" required>
+                        <option value="completada">Completada</option>
+                        <option value="pendiente">Pendiente</option>
+                        <option value="cancelada">Cancelada</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('ventaEdit')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <!-- Modal Nuevo Cliente -->
+    <div id="modalCliente" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-user-plus"></i> Registrar Nuevo Cliente</h3>
+                <button class="close-btn" onclick="closeModal('cliente')">&times;</button>
+            </div>
+            <form id="formCliente" onsubmit="guardarCliente(event)">
+                <div class="form-group">
+                    <label>Nombre / Razón Social *</label>
+                    <input type="text" id="clienteNombre" required placeholder="Nombre completo o empresa">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>RUC</label>
+                        <input type="text" id="clienteRuc" placeholder="20123456789" maxlength="11">
+                    </div>
+                    <div class="form-group">
+                        <label>Persona de Contacto</label>
+                        <input type="text" id="clienteContacto" placeholder="Nombre del contacto">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="clienteEmail" placeholder="cliente@email.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Teléfono</label>
+                        <input type="tel" id="clienteTelefono" placeholder="999-888-777">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Dirección</label>
+                    <input type="text" id="clienteDireccion" placeholder="Dirección fiscal o de entrega">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('cliente')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Cliente</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Nueva Meta -->
+    <div id="modalMeta" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-bullseye"></i> Establecer Meta de Ventas</h3>
+                <button class="close-btn" onclick="closeModal('meta')">&times;</button>
+            </div>
+            <form id="formMeta" onsubmit="guardarMeta(event)">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Mes *</label>
+                        <select id="metaMes" required>
+                            <option value="1">Enero</option>
+                            <option value="2">Febrero</option>
+                            <option value="3">Marzo</option>
+                            <option value="4">Abril</option>
+                            <option value="5">Mayo</option>
+                            <option value="6">Junio</option>
+                            <option value="7">Julio</option>
+                            <option value="8">Agosto</option>
+                            <option value="9">Septiembre</option>
+                            <option value="10">Octubre</option>
+                            <option value="11">Noviembre</option>
+                            <option value="12">Diciembre</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Año *</label>
+                        <select id="metaAnio" required>
+                            <!-- Se llena dinámicamente -->
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Monto Meta (S/) *</label>
+                    <input type="number" id="metaMontoInput" step="0.01" required placeholder="50000.00">
+                </div>
+                <div class="form-group">
+                    <label>Descripción</label>
+                    <input type="text" id="metaDescripcion" placeholder="Ej: Meta por campaña de verano">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('meta')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Meta</button>
+                </div>
+            </form>
+        </div>
+    </div>
+<!-- Modal Editar Meta - AGREGAR DESPUÉS DEL MODAL META -->
+<div id="modalMetaEdit" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-bullseye"></i> Editar Meta de Ventas</h3>
+            <button class="close-btn" onclick="closeModal('metaEdit')">&times;</button>
+        </div>
+        <form id="formMetaEdit" onsubmit="guardarEdicionMeta(event)">
+            <input type="hidden" id="editMetaId">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Mes *</label>
+                    <select id="editMetaMes" required disabled style="background: #f0f0f0;">
+                        <option value="1">Enero</option>
+                        <option value="2">Febrero</option>
+                        <option value="3">Marzo</option>
+                        <option value="4">Abril</option>
+                        <option value="5">Mayo</option>
+                        <option value="6">Junio</option>
+                        <option value="7">Julio</option>
+                        <option value="8">Agosto</option>
+                        <option value="9">Septiembre</option>
+                        <option value="10">Octubre</option>
+                        <option value="11">Noviembre</option>
+                        <option value="12">Diciembre</option>
+                    </select>
+                    <small style="color: #999; font-size: 11px;">El mes no se puede cambiar</small>
+                </div>
+                <div class="form-group">
+                    <label>Año *</label>
+                    <select id="editMetaAnio" required disabled style="background: #f0f0f0;">
+                        <!-- Se llena dinámicamente -->
+                    </select>
+                    <small style="color: #999; font-size: 11px;">El año no se puede cambiar</small>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Monto Meta (S/) *</label>
+                <input type="number" id="editMetaMonto" step="0.01" required placeholder="50000.00">
+            </div>
+            <div class="form-group">
+                <label>Descripción</label>
+                <input type="text" id="editMetaDescripcion" placeholder="Ej: Meta por campaña de verano">
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('metaEdit')">Cancelar</button>
+                <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+            </div>
+        </form>
+    </div>
+</div>
+    <!-- Notificaciones -->
+    <div id="notificaciones" class="notificaciones"></div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
