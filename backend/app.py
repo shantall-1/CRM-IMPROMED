@@ -1,3 +1,5 @@
+import http
+
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
@@ -706,7 +708,14 @@ def handle_connect():
 def handle_disconnect():
     print('Cliente desconectado')
 
+
+# ==================== INICIO ====================
 if __name__ == '__main__':
-    print("🚀 Servidor iniciado en http://localhost:5000")
-    print("📊 Dashboard disponible")
-    socketio.run(app, debug=True, host='0.0.0.0', port=5000)
+    print(f"🚀 Servidor iniciado en http://localhost:5000")
+    print(f"📊 Dashboard disponible")
+    debug_mode = os.environ.get('FLASK_ENV') != 'production'
+    socketio.run(app, 
+                debug=debug_mode, 
+                host='0.0.0.0', 
+                port=5000,
+                allow_unsafe_werkzeug=True) 
