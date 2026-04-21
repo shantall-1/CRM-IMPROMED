@@ -1,29 +1,19 @@
-import http
-
+import os
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
-import os
 import io
-import csv
 import traceback
 from datetime import datetime, timedelta
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
-import random
 
-# ✅ SOLO importar desde database.py
 from database import db, Cliente, Venta, MetaVentas, init_db
 
 # Configuración inicial
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATABASE_DIR = os.path.join(BASE_DIR, 'database')
-
-if not os.path.exists(DATABASE_DIR):
-    os.makedirs(DATABASE_DIR)
-    print(f"✅ Carpeta database creada: {DATABASE_DIR}")
 
 app = Flask(__name__)
 CORS(app, resources={
@@ -33,43 +23,10 @@ CORS(app, resources={
         "allow_headers": ["Content-Type", "Authorization"]
     }
 })
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
-# Configurar base de datos usando init_db
+# Configurar base de datos
 init_db(app)
-
-# ==================== RUTA PARA GUARDAR CLIENTES ====================
-@app.route('/api/clientes', methods=['POST'])
-def crear_cliente():
-    try:
-        data = request.get_json()
-        
-        # Validar datos mínimos
-        if not data or not data.get('nombre'):
-            return jsonify({'error': 'El nombre es obligatorio'}), 400
-
-        # Crear instancia del modelo Cliente
-        nuevo_cliente = Cliente(
-            nombre=data.get('nombre'),
-            email=data.get('email'),
-            telefono=data.get('telefono')
-        )
-        
-        db.session.add(nuevo_cliente)
-        db.session.commit()
-        
-        # Notificar por WebSocket que hay un nuevo cliente (opcional pero recomendado)
-        socketio.emit('nuevo_cliente', nuevo_cliente.to_dict())
-        
-        return jsonify({
-            'message': 'Cliente guardado exitosamente',
-            'cliente': nuevo_cliente.to_dict()
-        }), 201
-        
-    except Exception as e:
-        db.session.rollback()
-        print(f"❌ Error al guardar cliente: {str(e)}")
-        return jsonify({'error': 'Error interno al guardar'}), 500
 
 # ==================== FUNCIONES AUXILIARES ====================
 
@@ -91,7 +48,6 @@ def get_anios_disponibles():
 with app.app_context():
     db.create_all()
     print("✅ Tablas creadas/verificadas")
-    # ✅ NO crear metas automáticamente - solo tablas vacías
 
 # ==================== API CLIENTES ====================
 
@@ -108,7 +64,6 @@ def clientes():
             if not data.get('nombre'):
                 return jsonify({'error': 'El nombre es obligatorio'}), 400
             
-            # Verificar si el RUC ya existe
             if data.get('ruc'):
                 existe = Cliente.query.filter_by(ruc=data['ruc']).first()
                 if existe:
@@ -127,7 +82,6 @@ def clientes():
             db.session.commit()
             
             print(f"✅ Cliente creado: {nuevo_cliente.to_dict()}")
-            
             socketio.emit('nuevo_cliente', nuevo_cliente.to_dict())
             return jsonify(nuevo_cliente.to_dict()), 201
             
@@ -217,7 +171,6 @@ def ventas():
             db.session.commit()
             
             print(f"✅ Venta creada: {nueva_venta.to_dict()}")
-            
             socketio.emit('nueva_venta', nueva_venta.to_dict())
             socketio.emit('actualizar_dashboard', {})
             
@@ -255,7 +208,6 @@ def ventas():
         categoria = request.args.get('categoria')
         if categoria:
             query = query.filter_by(categoria=categoria)
-        
         monto_min = request.args.get('monto_min')
         monto_max = request.args.get('monto_max')
         if monto_min:
@@ -285,7 +237,8 @@ def venta_detalle(id):
         elif request.method == 'PUT':
             data = request.get_json()
             
-            # ✅ Actualizar solo los campos que se envían
+            if 'cliente_id' in data:
+                venta.cliente_id = int(data['cliente_id'])
             if 'monto' in data:
                 venta.monto = float(data['monto'])
             if 'categoria' in data:
@@ -296,13 +249,13 @@ def venta_detalle(id):
                 venta.descripcion = data['descripcion']
             if 'metodo_pago' in data:
                 venta.metodo_pago = data['metodo_pago']
-            if 'estado' in data:  # ← ESTO ES LO IMPORTANTE
+            if 'estado' in data:
                 venta.estado = data['estado']
             
             db.session.commit()
             socketio.emit('venta_actualizada', venta.to_dict())
             socketio.emit('actualizar_dashboard', {})
-            return jsonify(venta.to_dict())
+            return jsonify(enta.to_dict())
         
         elif request.method == 'DELETE':
             db.session.delete(venta)
@@ -314,7 +267,7 @@ def venta_detalle(id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
-    
+
 # ==================== API ESTADÍSTICAS ====================
 
 @app.route('/api/estadisticas/dashboard', methods=['GET'])
@@ -343,7 +296,6 @@ def dashboard_stats():
         total_clientes = Cliente.query.count()
         ventas_pendientes = Venta.query.filter_by(estado='pendiente').count()
         
-        # ✅ Solo buscar meta, NO crear automáticamente
         meta = MetaVentas.query.filter_by(mes=mes_actual, anio=anio_actual).first()
         
         if meta:
@@ -496,10 +448,9 @@ def ventas_por_metodo():
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    
-    
 
 # ==================== API METAS ====================
+
 @app.route('/api/metas', methods=['GET', 'POST'])
 def metas():
     if request.method == 'POST':
@@ -507,20 +458,16 @@ def metas():
             data = request.get_json()
             print(f"📥 Datos de meta recibidos: {data}")
             
-            # Validar datos requeridos
             if not data.get('mes') or not data.get('anio') or not data.get('monto_meta'):
                 return jsonify({'error': 'Mes, año y monto son obligatorios'}), 400
             
-            # Convertir a números
             mes = int(data['mes'])
             anio = int(data['anio'])
             monto_meta = float(data['monto_meta'])
             
-            # Validar rango del monto (máximo razonable)
             if monto_meta < 0 or monto_meta > 999999999.99:
                 return jsonify({'error': 'Monto debe ser entre 0 y 999,999,999.99'}), 400
             
-            # Buscar si ya existe
             existe = MetaVentas.query.filter_by(mes=mes, anio=anio).first()
             
             if existe:
@@ -530,7 +477,6 @@ def metas():
                 print(f"✅ Meta actualizada: {existe.to_dict()}")
                 return jsonify(existe.to_dict()), 200
             
-            # Crear nueva
             nueva_meta = MetaVentas(
                 mes=mes,
                 anio=anio,
@@ -550,8 +496,6 @@ def metas():
             print(f"❌ Error creando meta: {str(e)}")
             print(traceback.format_exc())
             return jsonify({'error': str(e)}), 500
-        
-        
     
     # GET - Listar metas
     try:
@@ -560,27 +504,31 @@ def metas():
     except Exception as e:
         print(f"❌ Error listando metas: {str(e)}")
         return jsonify({'error': str(e)}), 500
-    
-@app.route('/api/metas/<int:id>', methods=['PUT'])
+
+@app.route('/api/metas/<int:id>', methods=['PUT', 'DELETE'])
 def actualizar_meta(id):
     try:
-        data = request.get_json()
         meta = MetaVentas.query.get_or_404(id)
         
-        # Actualizar campos
-        if 'monto_meta' in data:
-            meta.monto_meta = float(data['monto_meta'])
-        if 'descripcion' in data:
-            meta.descripcion = data['descripcion']
-        # No permitimos cambiar mes y año para mantener integridad
+        if request.method == 'PUT':
+            data = request.get_json()
+            if 'monto_meta' in data:
+                meta.monto_meta = float(data['monto_meta'])
+            if 'descripcion' in data:
+                meta.descripcion = data['descripcion']
+            
+            db.session.commit()
+            return jsonify(meta.to_dict())
         
-        db.session.commit()
-        return jsonify(meta.to_dict())
-        
+        elif request.method == 'DELETE':
+            db.session.delete(meta)
+            db.session.commit()
+            return jsonify({'mensaje': 'Meta eliminada'})
+            
     except Exception as e:
         db.session.rollback()
         print(f"❌ Error actualizando meta: {str(e)}")
-        return jsonify({'error': str(e)}), 500    
+        return jsonify({'error': str(e)}), 500
 
 # ==================== REPORTES PDF ====================
 
@@ -596,7 +544,7 @@ def generar_reporte(tipo):
             'CustomTitle',
             parent=styles['Heading1'],
             fontSize=24,
-            textColor=colors.HexColor('#667eea'),
+            textColor=colors.HexColor('#1e3a5f'),
             spaceAfter=30
         )
         
@@ -604,7 +552,6 @@ def generar_reporte(tipo):
         elements.append(Paragraph(f"Fecha: {datetime.now().strftime('%d/%m/%Y %H:%M')}", styles['Normal']))
         elements.append(Spacer(1, 20))
         
-        # Obtener datos según tipo
         if tipo == 'diario':
             hoy = datetime.now()
             ventas = Venta.query.filter(db.func.date(Venta.fecha_venta) == hoy.date()).all()
@@ -670,7 +617,7 @@ def generar_reporte(tipo):
             
             t_detalle = Table(data_detalle, colWidths=[80, 120, 100, 80, 80])
             t_detalle.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e3a5f')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
@@ -708,14 +655,9 @@ def handle_connect():
 def handle_disconnect():
     print('Cliente desconectado')
 
-
 # ==================== INICIO ====================
 if __name__ == '__main__':
-    print(f"🚀 Servidor iniciado en http://localhost:5000")
-    print(f"📊 Dashboard disponible")
+    port = int(os.environ.get("PORT", 5000))
+    print(f"🚀 Servidor iniciado en http://localhost:{port}")
     debug_mode = os.environ.get('FLASK_ENV') != 'production'
-    socketio.run(app, 
-                debug=debug_mode, 
-                host='0.0.0.0', 
-                port=5000,
-                allow_unsafe_werkzeug=True) 
+    socketio.run(app, debug=debug_mode, host='0.0.0.0', port=port)
